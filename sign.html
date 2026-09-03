@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>חתימה על חוזה הלוואה</title>
+<style>
+:root{--bg:#f4f7f4;--card:#fff;--ink:#183a2a;--muted:#6b7c72;--green:#1f7a4d;--green-d:#155c39;--line:#dbe6de;--red:#b23b3b;--shadow:0 2px 10px rgba(20,60,40,.08)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;padding:20px;display:flex;justify-content:center}
+.box{background:var(--card);border-radius:20px;padding:26px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(20,60,40,.12);height:fit-content}
+h1{font-size:19px;text-align:center;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;text-align:center;margin-bottom:18px}
+.docsheet{font-size:14px;line-height:1.8;background:#fafcfa;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.docsheet p{margin:6px 0}
+.dochead{font-size:16px;font-weight:700;color:var(--green-d);text-align:center;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--green)}
+.padwrap{border:2px dashed var(--line);border-radius:12px;padding:10px;text-align:center;margin-bottom:10px}
+.padwrap label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+canvas{touch-action:none;background:#fff;border:1px solid var(--line);border-radius:8px;width:100%;max-width:460px;height:160px}
+.row{display:flex;gap:10px;justify-content:center;margin-top:8px}
+.btn{background:var(--green);color:#fff;border:0;padding:12px 20px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--green-d)}
+.btn.gray{background:#eef2ef;color:var(--ink)}
+.btn:disabled{opacity:.6}
+.err{color:var(--red);font-size:13px;text-align:center;margin-top:10px;min-height:18px}
+.check{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px}
+.center{text-align:center}
+.center p{color:var(--muted);font-size:14px;line-height:1.7}
+.loader{text-align:center;color:var(--muted);padding:40px 0}
+.confirm{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--muted);margin-bottom:14px;text-align:right}
+</style>
+</head>
+<body>
+<div class="box" id="box">
+  <div class="loader" id="loader">טוען את פרטי החוזה…</div>
+</div>
+<script src="js/config.js"></script>
+<script>
+const params=new URLSearchParams(location.search);
+const loanId=params.get("loan");
+const box=document.getElementById("box");
+const nis=n=>"₪"+(Math.round(n||0)).toLocaleString("he-IL");
+const heDate=s=>{if(!s)return"";const[y,m,d]=s.split("-");return `${+d}.${+m}.${y}`};
+function addMonths(dateStr,n){
+  const [y,m,d]=dateStr.split("-").map(Number);
+  const total=(m-1)+n, ny=y+Math.floor(total/12), nm=((total%12)+12)%12;
+  const daysInMonth=new Date(ny,nm+1,0).getDate();
+  return ny+"-"+String(nm+1).padStart(2,"0")+"-"+String(Math.min(d,daysInMonth)).padStart(2,"0");
+}
+function esc(s){return(s==null?"":""+s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+async function boot(){
+  if(!loanId){box.innerHTML='<div class="err">קישור לא תקין — חסר מזהה הלוואה.</div>';return}
+  let rows;
+  try{
+    const res=await fetch(`${CFG.url}/rest/v1/rpc/get_loan_for_signing`,{
+      method:"POST",
+      headers:{"apikey":CFG.anon,"Authorization":`Bearer ${CFG.anon}`,"Content-Type":"application/json","Accept-Profile":CFG.schema,"Content-Profile":CFG.schema},
+      body:JSON.stringify({p_loan_id:loanId})
+    });
+    rows=await res.json();
+  }catch(e){box.innerHTML='<div class="err">שגיאת רשת — נסה שוב.</div>';return}
+  if(!rows||!rows.length){box.innerHTML='<div class="err">הקישור הזה לא תקין, או שההלוואה לא נמצאה. פנה לגבאי.</div>';return}
+  const l=rows[0];
+  if(l.already_signed){
+    box.innerHTML=`<div class="center"><div class="check">✓</div><h1>כבר נחתם</h1><p>החוזה הזה כבר נחתם בעבר. אם זו טעות, פנה לגבאי.</p></div>`;
+    return;
+  }
+  const per=Math.round(l.amount/(l.installments||12));
+  const first=addMonths(l.loan_date,1), last=addMonths(l.loan_date,l.installments||12);
+  box.innerHTML=`
+    <h1>חתימה על חוזה הלוואה</h1>
+    <div class="sub">${esc(l.gemach_name)}</div>
+    <div class="docsheet">
+      <div class="dochead">◆ חוזה הלוואה — ${esc(l.gemach_name)}</div>
+      <p>נערך ונחתם ביום ${heDate(l.loan_date)}</p>
+      <p>בין הגמ״ח (להלן: המלווה) לבין: <b>${esc(l.person_name)}</b> ת.ז. ${esc(l.person_id_num||"____________")}</p>
+      <p>מכתובת: ${esc(l.person_address||"____________")} טלפון: ${esc(l.person_phone||"____________")}</p>
+      <p>(להלן: הלווה)</p>
+      <p>1. המלווה מעניק ללווה הלוואה בסך ${l.amount.toLocaleString("he-IL")} ש״ח (להלן: סכום ההלוואה).</p>
+      <p>2. הלווה מתחייב להחזיר את סכום ההלוואה ב-${l.installments||12} תשלומים חודשיים שווים בסך ${per.toLocaleString("he-IL")} ש״ח כל אחד.</p>
+      <p>3. התשלום הראשון ישולם עד ליום ${heDate(first)}, והאחרון עד ליום ${heDate(last)}.</p>
+      <p>4. ההלוואה ניתנת ללא ריבית וללא הצמדה, בהתאם להלכות איסור ריבית.</p>
+      <p>5. איחור בתשלום מחייב הודעה מוקדמת למלווה ותיאום מועד חלופי.</p>
+      <p>6. הלווה מאשר כי קרא את החוזה, הבין את תוכנו, וחתם עליו מרצונו החופשי.</p>
+      ${(l.guarantor1||l.guarantor2)?`<p style="margin-top:10px"><b>ערבים:</b> ${[l.guarantor1,l.guarantor2].filter(Boolean).map(esc).join(" · ")}</p>`:""}
+    </div>
+    <label class="confirm"><input type="checkbox" id="ack" style="margin-top:2px">קראתי את נוסח החוזה למעלה, הבנתי את תוכנו, ואני חותם/ת עליו מרצוני החופשי.</label>
+    <div class="padwrap">
+      <label>חתום כאן באצבע / עכבר</label>
+      <canvas id="pad" width="460" height="160"></canvas>
+      <div class="row"><button class="btn gray" id="clear" type="button">ניקוי</button></div>
+    </div>
+    <div class="row"><button class="btn" id="submit" type="button">אישור וחתימה</button></div>
+    <div class="err" id="err"></div>
+  `;
+  setupPad();
+}
+
+function setupPad(){
+  const canvas=document.getElementById("pad");
+  const ctx=canvas.getContext("2d");
+  ctx.lineWidth=2.4;ctx.lineCap="round";ctx.strokeStyle="#183a2a";
+  let strokes=[], cur=null, drawing=false;
+  const rect=()=>canvas.getBoundingClientRect();
+  const scaleX=()=>canvas.width/rect().width, scaleY=()=>canvas.height/rect().height;
+  function pos(ev){
+    const r=rect();
+    const cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+    const cy=(ev.touches?ev.touches[0].clientY:ev.clientY)-r.top;
+    return [Math.round(cx*scaleX()),Math.round(cy*scaleY())];
+  }
+  function start(ev){ev.preventDefault();drawing=true;cur=[];strokes.push(cur);const p=pos(ev);cur.push(p);ctx.beginPath();ctx.moveTo(p[0],p[1])}
+  function move(ev){if(!drawing)return;ev.preventDefault();const p=pos(ev);cur.push(p);ctx.lineTo(p[0],p[1]);ctx.stroke()}
+  function end(){drawing=false}
+  canvas.addEventListener("mousedown",start);canvas.addEventListener("mousemove",move);window.addEventListener("mouseup",end);
+  canvas.addEventListener("touchstart",start,{passive:false});canvas.addEventListener("touchmove",move,{passive:false});canvas.addEventListener("touchend",end);
+  document.getElementById("clear").addEventListener("click",()=>{strokes=[];ctx.clearRect(0,0,canvas.width,canvas.height)});
+  document.getElementById("submit").addEventListener("click",async()=>{
+    const errEl=document.getElementById("err");
+    if(!document.getElementById("ack").checked){errEl.textContent="יש לסמן שקראת והבנת את החוזה";return}
+    if(!strokes.length){errEl.textContent="יש לחתום במסגרת המיועדת לחתימה";return}
+    const btn=document.getElementById("submit");btn.disabled=true;btn.textContent="שולח…";errEl.textContent="";
+    const sig={v:1,w:canvas.width,h:canvas.height,s:strokes};
+    try{
+      const res=await fetch(`${CFG.url}/rest/v1/rpc/sign_loan`,{
+        method:"POST",
+        headers:{"apikey":CFG.anon,"Authorization":`Bearer ${CFG.anon}`,"Content-Type":"application/json","Accept-Profile":CFG.schema,"Content-Profile":CFG.schema},
+        body:JSON.stringify({p_loan_id:loanId,p_sig:sig})
+      });
+      const ok=await res.json();
+      if(!res.ok)throw new Error("שגיאת שרת");
+      if(ok!==true){
+        box.innerHTML=`<div class="center"><div class="check">✓</div><h1>כבר נחתם</h1><p>מישהו כבר חתם על החוזה הזה. אם זו טעות, פנה לגבאי.</p></div>`;
+        return;
+      }
+      box.innerHTML=`<div class="center"><div class="check">✓</div><h1>נחתם בהצלחה</h1><p>תודה. החתימה נקלטה ונשמרה אצל הגבאי.</p></div>`;
+    }catch(e){
+      errEl.textContent="שליחה נכשלה — נסה שוב.";
+      btn.disabled=false;btn.textContent="אישור וחתימה";
+    }
+  });
+}
+boot();
+</script>
+</body>
+</html>

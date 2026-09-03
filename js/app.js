@@ -9,7 +9,16 @@ function toast(msg,bad){const t=document.getElementById("toast");t.textContent=m
 
 /* ===== מיפוי DB <-> מודל מקומי ===== */
 const mapPerson=r=>({id:r.id,name:r.name,phone:r.phone||"",idNum:r.id_num||"",branch:r.branch||"",address:r.address||"",notes:r.notes||""});
-const mapLoan=r=>({id:r.id,personId:r.person_id,amount:+r.amount,date:r.loan_date,dueDate:r.due_date||"",notes:r.notes||"",installments:r.installments||12,guarantor1:r.guarantor1||"",guarantor2:r.guarantor2||"",contractLink:r.contract_link||""});
+const mapLoan=r=>({id:r.id,personId:r.person_id,amount:+r.amount,date:r.loan_date,dueDate:r.due_date||"",notes:r.notes||"",installments:r.installments||12,guarantor1:r.guarantor1||"",guarantor2:r.guarantor2||"",contractLink:r.contract_link||"",signatureData:r.signature_data||null,signedAt:r.signed_at||""});
+function signLinkFor(loanId){return location.origin+location.pathname.replace(/index\.html$/,"").replace(/\/$/,"")+"/sign.html?loan="+loanId}
+function copySignLink(loanId){navigator.clipboard.writeText(signLinkFor(loanId));toast("קישור לחתימה הועתק — אפשר לשלוח בוואטסאפ/מייל")}
+function signatureSvg(sig,w,h){
+  if(!sig||!sig.s||!sig.s.length)return"";
+  w=w||180;h=h||64;
+  const sx=w/(sig.w||w), sy=h/(sig.h||h);
+  const paths=sig.s.map(stroke=>"M"+stroke.map(([x,y])=>`${(x*sx).toFixed(1)},${(y*sy).toFixed(1)}`).join(" L ")).join(" ");
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:block"><path d="${paths}" fill="none" stroke="#183a2a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
 const mapRepay=r=>({id:r.id,loanId:r.loan_id,amount:+r.amount,date:r.pay_date,note:r.note||""});
 const mapCash=r=>({id:r.id,type:r.entry_type,amount:+r.amount,date:r.entry_date,source:r.source||"",note:r.note||""});
 const mapReq=r=>({id:r.id,name:r.name,phone:r.phone||"",amount:+r.amount||0,reason:r.reason||"",date:r.req_date,status:r.status});
@@ -220,7 +229,9 @@ function openPerson(id){
       <div style="font-size:13px;margin:6px 0">הוחזר ${nis(paid)} · יתרה <b>${nis(loanBalance(l))}</b></div>
       <div class="bar"><i style="width:${l.amount?Math.min(100,paid/l.amount*100):0}%"></i></div>
       ${rp.length?`<table style="margin-top:8px"><tbody>${rp.map(r=>`<tr><td class="muted" style="font-size:12.5px">${heDate(r.date)} ${esc(r.note||"")}</td><td class="right">${nis(r.amount)}</td><td style="width:1%"><button class="link" style="color:var(--red)" onclick="delRepay('${r.id}','${id}')">✕</button></td></tr>`).join("")}</tbody></table>`:""}
-      ${l.contractLink?`<div style="margin-top:6px"><a class="link" href="${esc(l.contractLink)}" target="_blank" rel="noopener">📎 החוזה החתום</a></div>`:""}
+      ${l.contractLink?`<div style="margin-top:6px"><a class="link" href="${esc(l.contractLink)}" target="_blank" rel="noopener">📎 סריקת החוזה (עט)</a></div>`:""}
+      ${l.signatureData?`<div class="pill" style="background:var(--green-l);color:var(--green-d);margin-top:6px">✓ נחתם דיגיטלית · ${heDate((l.signedAt||"").slice(0,10))}</div><div style="border:1px solid var(--line);border-radius:8px;padding:6px;margin-top:4px;background:#fff;width:fit-content">${signatureSvg(l.signatureData,150,54)}</div>`
+        :`<div class="row" style="margin-top:6px;align-items:center"><span class="muted" style="font-size:12.5px">טרם נחתם דיגיטלית</span><button class="link" onclick="copySignLink('${l.id}')">🔗 קישור לחתימה מרחוק</button></div>`}
       <div class="row" style="margin-top:8px">${st!=="closed"?`<button class="btn mini" onclick="addRepay('${l.id}','${id}')">+ החזר</button>`:""}<button class="btn ghost mini" onclick="docPerson='${id}';docLoan='${l.id}';closeModal();go('docs')">📄 מסמכים</button><button class="btn gray mini" onclick="editLoan('${l.id}','${id}')">עריכה</button><button class="btn danger mini" onclick="delLoan('${l.id}','${id}')">מחיקה</button></div>
     </div>`}).join(""):'<div class="empty">אין הלוואות רשומות</div>'}
   `);
@@ -479,8 +490,12 @@ function docContractHtml(person,l){
   return `<div class="card print-doc" id="doc-contract">
     <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
       <h2 style="margin:0">חוזה הלוואה</h2>
-      <button class="btn mini no-print" onclick="printDoc('doc-contract')">🖨 הדפס חוזה</button>
+      <div class="row no-print" style="gap:8px">
+        ${!l.signatureData?`<button class="btn ghost mini" onclick="copySignLink('${l.id}')">🔗 קישור לחתימה מרחוק</button>`:""}
+        <button class="btn mini" onclick="printDoc('doc-contract')">🖨 הדפס חוזה</button>
+      </div>
     </div>
+    ${!l.signatureData?`<div class="notice no-print" style="margin-bottom:10px">אפשר גם לשלוח ללווה קישור לחתום מרחוק, בלי הדפסה: <code style="user-select:all">${signLinkFor(l.id)}</code></div>`:""}
     <div class="docsheet">
       <div class="dochead">◆ חוזה הלוואה — ${esc(db.settings.name)}</div>
       <p>נערך ונחתם ביום ${heDate(l.date)}</p>
@@ -496,8 +511,9 @@ function docContractHtml(person,l){
       <p style="margin-top:14px"><b>ערבים (שם מלא, ת.ז. וחתימה):</b></p>
       <p>1. ${esc(l.guarantor1||"")}&nbsp; ______________________________________________________</p>
       <p>2. ${esc(l.guarantor2||"")}&nbsp; ______________________________________________________</p>
-      <div class="row" style="margin-top:18px">
-        <div>חתימת הלווה: ______________</div>
+      <div class="row" style="margin-top:18px;align-items:flex-end">
+        <div>חתימת הלווה: ${l.signatureData?signatureSvg(l.signatureData,130,46):"______________"}
+          ${l.signedAt?`<div class="muted" style="font-size:11px">נחתם דיגיטלית ${heDate((l.signedAt||"").slice(0,10))}</div>`:""}</div>
         <div class="right">חתימת הגבאי: ______________</div>
       </div>
     </div>
