@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>בקשת הלוואה — גמ"ח כספים</title>
+<style>
+:root{--bg:#f4f7f4;--card:#fff;--ink:#183a2a;--muted:#6b7c72;--green:#1f7a4d;--green-d:#155c39;--line:#dbe6de;--red:#b23b3b;--shadow:0 2px 10px rgba(20,60,40,.08)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:radial-gradient(1200px 600px at 50% -10%,#e7f3ec,var(--bg));color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{background:var(--card);border-radius:20px;padding:30px 26px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(20,60,40,.12)}
+.logo{width:52px;height:52px;margin:0 auto 12px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--green-d));color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:var(--shadow)}
+h1{font-size:19px;text-align:center;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;text-align:center;margin-bottom:20px}
+.f{margin-bottom:12px;text-align:right}
+.f label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px}
+input,textarea{width:100%;font-family:inherit;font-size:14px;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+input:focus,textarea:focus{outline:2px solid #e7f3ec;border-color:var(--green)}
+.btn{width:100%;background:var(--green);color:#fff;border:0;padding:12px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:6px}
+.btn:hover{background:var(--green-d)}
+.btn:disabled{opacity:.6}
+.err{color:var(--red);font-size:13px;min-height:18px;margin-top:8px;text-align:center}
+.done{text-align:center}
+.done .check{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px}
+.done p{color:var(--muted);font-size:14px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="box" id="box">
+  <div class="logo">₪</div>
+  <h1 id="gname">בקשה להלוואה</h1>
+  <div class="sub">למלא את הפרטים — הגבאי יחזור אליך בהקדם</div>
+  <form id="frm">
+    <div class="f"><label>שם מלא *</label><input id="q_name" required></div>
+    <div class="f"><label>טלפון</label><input id="q_phone" type="tel"></div>
+    <div class="f"><label>סכום מבוקש</label><input id="q_amount" type="number" inputmode="numeric"></div>
+    <div class="f"><label>סיבה / מטרה</label><textarea id="q_reason" rows="3"></textarea></div>
+    <button class="btn" id="btn" type="submit">שליחת בקשה</button>
+    <div class="err" id="err"></div>
+  </form>
+</div>
+<script src="js/config.js"></script>
+<script>
+document.getElementById("frm").addEventListener("submit", async (ev)=>{
+  ev.preventDefault();
+  const name=document.getElementById("q_name").value.trim();
+  const errEl=document.getElementById("err");
+  if(!name){errEl.textContent="חובה למלא שם";return}
+  const btn=document.getElementById("btn");btn.disabled=true;btn.textContent="שולח…";errEl.textContent="";
+  const body={
+    name,
+    phone:document.getElementById("q_phone").value.trim(),
+    amount:+document.getElementById("q_amount").value||null,
+    reason:document.getElementById("q_reason").value.trim(),
+    req_date:new Date().toISOString().slice(0,10),
+    status:"wait"
+  };
+  try{
+    const res=await fetch(`${CFG.url}/rest/v1/requests`,{
+      method:"POST",
+      headers:{"apikey":CFG.anon,"Authorization":`Bearer ${CFG.anon}`,"Content-Type":"application/json","Accept-Profile":CFG.schema,"Content-Profile":CFG.schema,"Prefer":"return=minimal"},
+      body:JSON.stringify(body)
+    });
+    if(!res.ok){const t=await res.text();throw new Error(t||("שגיאת שרת "+res.status))}
+    document.getElementById("box").innerHTML=`
+      <div class="done">
+        <div class="check">✓</div>
+        <h1>הבקשה נשלחה</h1>
+        <p>תודה, ${name.split(" ")[0]||""}. הבקשה שלך נקלטה ותיבדק בהקדם.<br>נחזור אליך בטלפון אם השארת מספר.</p>
+      </div>`;
+  }catch(e){
+    errEl.textContent="לא הצלחנו לשלוח — נסה שוב או פנה טלפונית. ("+e.message+")";
+    btn.disabled=false;btn.textContent="שליחת בקשה";
+  }
+});
+</script>
+</body>
+</html>

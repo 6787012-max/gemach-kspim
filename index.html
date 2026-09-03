@@ -86,6 +86,17 @@ tbody tr:hover{background:#fafcfa}
 .loginbox .btn{width:100%;margin-top:6px}
 .loginerr{color:var(--red);font-size:13px;min-height:18px;margin-top:10px}
 
+/* מסמכים להדפסה */
+.docsheet{font-size:14px;line-height:1.9}
+.docsheet p{margin:6px 0}
+.dochead{font-size:17px;font-weight:700;color:var(--green-d);text-align:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--green)}
+@media print{
+  body.printing-doc nav.tabs,body.printing-doc header.top,body.printing-doc .toast,body.printing-doc .no-print{display:none!important}
+  body.printing-doc .card:not(.print-only){display:none!important}
+  body.printing-doc .card.print-only{box-shadow:none;border:0;padding:0}
+  body.printing-doc{background:#fff}
+}
+
 /* toast */
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.2s;z-index:99}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
